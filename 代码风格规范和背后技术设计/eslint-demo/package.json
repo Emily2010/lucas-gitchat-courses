@@ -1,0 +1,13 @@
+{
+  "name": "eslint-demo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+	"scripts": {
+    "lint": "eslint --debug src/",
+    "lint:write": "eslint --debug src/ --fix"
+	 },
+  "devDependencies": {
+    "eslint": "^5.15.3"
+  }
+}
