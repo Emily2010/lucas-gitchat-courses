@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "prettier": "prettier --write src/index.js",
-    "pretty-quick": "pretty-quick",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
