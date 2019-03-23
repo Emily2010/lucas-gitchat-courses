@@ -1,15 +1,11 @@
 {
   "name": "prettier-demo",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
+  "license": "MIT",
   "scripts": {
-    "prettier": "prettier --write src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prettier": "prettier --write src/index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "husky": {
     "hooks": {
       "pre-commit": "pretty-quick --staged"
