@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "prettier": "prettier --write src/index.js",
+    "pretty-quick": "pretty-quick --staged",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,7 +13,7 @@
   "license": "ISC",
   "husky": {
     "hooks": {
-      "pre-commit": "pretty-quick --staged"
+      "pre-commit": "pretty-quick"
     }
   },
   "devDependencies": {
