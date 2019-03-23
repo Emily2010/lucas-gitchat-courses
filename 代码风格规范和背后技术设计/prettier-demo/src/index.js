@@ -4,7 +4,7 @@ let person = {
 };
 
 function trainJedi(jediWarrion) {
-  		 if (jediWarrion.name  === 'Yoda') {
+  		if (jediWarrion.name  === 'Yoda') {
     console.log('No need! already trained');
   }
   	console.log(`Training ${jediWarrion.name} complete`);
