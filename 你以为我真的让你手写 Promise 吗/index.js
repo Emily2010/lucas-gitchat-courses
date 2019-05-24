@@ -1,222 +1,227 @@
-const wxRequest = (url, data = {}, method = 'GET') => 
-  new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      data,
-      method,
-      header: {
-        // 通用化 header 设置
-      },
-      success: function (res) {
-        const code = res.statusCode
-        if (code !== 200) {
-          reject({ error: 'request fail', code })
-          return
-        }
-        resolve(res.data)
-      },
-      fail: function (res) {
-        reject({ error: 'request fail'})
-      },
+function Promise(executor) {
+  this.status = 'pending'
+  this.value = null
+  this.reason = null
+  this.onFulfilledArray = []
+  this.onRejectedArray = []
+
+  const resolve = value => {
+    if (value instanceof Promise) {
+      return value.then(resolve, reject)
+    }
+    setTimeout(() => {
+      if (this.status === 'pending') {
+        this.value = value
+        this.status = 'fulfilled'
+
+        this.onFulfilledArray.forEach(func => {
+          func(value)
+        })
+      }
     })
-  })
-
-const promisify = fn => args => 
-  new Promise((resolve, reject) => {
-    args.success = function(res) {
-      return resolve(res)
-    }
-    args.fail = function(res) {
-      return reject(res)
-    }
-  })
-
-
-function Promise(executor) {
-
-}
-
-
-wxRequest('./userInfo')
-  .then(
-    data => wxRequest(`./${data.id}/friendList`),
-    error => {
-      console.log(error)
-    }
-  )
-  .then(
-    data => {
-      console.log(data)
-    },
-    error => {
-      console.log(error)
-    }
-  )
-
-
-let promise1 = new Promise((resolve, reject) => {
-  resolve('data')
-})
-
-promise1.then(data => {
-  console.log(data)
-})
-
-let promise2 = new Promise((resolve, reject) => {
-  reject('error')
-})
-
-promise2.then(data => {
-  console.log(data)
-}, error => {
-  console.log(error)
-})
-
-
-
-function Promise(executor) {
-  this.status = 'pending'
-  this.value = null
-  this.reason = null
-
-  const self = this
-
-  const resolve = value => {
-    self.value = value
   }
 
   const reject = reason => {
-    self.reason = reason
+    setTimeout(() => {
+      if (this.status === 'pending') {
+        this.reason = reason
+        this.status = 'rejected'
+
+        this.onRejectedArray.forEach(func => {
+          func(reason)
+        })
+      }
+    })
   }
 
-  executor(resolve, reject)
+
+  try {
+    executor(resolve, reject)
+  } catch(e) {
+    reject(e)
+  }
 }
 
-Promise.prototype.then = function(onfulfilled = Function.prototype, onrejected = Function.prototype) {
-  onfulfilled(this.value)
-
-  onrejected(this.reason)
-}
-
-
-function Promise(executor) {
-  this.status = 'pending'
-  this.value = null
-  this.reason = null
-
-  const self = this
-
-  function resolve(value) {
-    self.value = value
+const resolvePromise = (promise2, result, resolve, reject) => {
+  // 当 result 和 promise2 相等时，也就是说 onfulfilled 返回 promise2 时，进行 reject
+  if (result === promise2) {
+    return reject(new TypeError('error due to circular reference'))
   }
 
-  function reject(reason) {
-    self.reason = reason
-  }
+  // 是否已经执行过 onfulfilled 或者 onrejected
+  let consumed = false
+  let thenable
 
-  executor(resolve, reject)
-}
-
-Promise.prototype.then = function(onfulfilled = Function.prototype, onrejected = Function.prototype) {
-  onfulfilled(this.value)
-
-  onrejected(this.reason)
-}
-
-
-function Promise(executor) {
-  this.status = 'pending'
-  this.value = null
-  this.reason = null
-
-  const self = this
-
-  function resolve(value) {
-    self.value = value
-  }
-
-  function reject(reason) {
-    self.reason = reason
-  }
-
-  executor(resolve, reject)
-}
-
-Promise.prototype.then = function(onfulfilled = Function.prototype, onrejected = Function.prototype) {
-  onfulfilled(this.value)
-
-  onrejected(this.reason)
-}
-
-
-
-
-
-
-
-
-function Promise(executor) {
-  this.status = 'pending'
-  this.value = null
-  this.reason = null
-  this.onFulfilledArray = []
-  this.onRejectedArray = []
-
-  const resolve = value => {
-    if (this.status === 'pending') {
-      this.value = value
-      this.status = 'fulfilled'
-
-      this.onFulfilledArray.forEach(func => {
-        func(this.value)
-      })
+  if (result instanceof Promise) {
+    if (result.status === 'pending') {
+      result.then(function(data) {
+        resolvePromise(promise2, data, resolve, reject)
+      }, reject)
+    } else {
+      result.then(resolve, reject)
     }
+    return
   }
 
-  const reject = reason => {
-    if (this.status === 'pending') {
-      this.reason = reason
-      this.status = 'rejected'
-      this.onRejectedArray.forEach(func => {
-        func(this.reason)
-      })
-    }
-  }
-
-  setTimeout(() => {
+  let isComplexResult = target => (typeof target === 'function' || typeof target === 'object') && (target !== null)
+  // 如果返回的是疑似 Promise 类型
+  if (isComplexResult(result)) {
     try {
-      executor(resolve, reject)
+      thenable = result.then
+      // 如果返回的是 Promise 类型，具有 then 方法
+      if (typeof thenable === 'function') {
+        thenable.call(result, function(data) {
+          if (consumed) {
+            return
+          }
+          consumed = true
+
+          return resolvePromise(promise2, data, resolve, reject)
+        }, function(error) {
+          if (consumed) {
+            return
+          }
+          consumed = true
+
+          return reject(error)
+        })
+      }
+      else {
+        return resolve(result)
+      }
+      
     } catch(e) {
-      reject(e)
+      if (consumed) {
+        return
+      }
+      consumed = true
+      return reject(e)
     }
-  })
+  }
+  else {
+    return resolve(result)
+  }
+}
+
+Promise.prototype.then = function(onfulfilled, onrejected) {
+  onfulfilled = typeof onfulfilled === 'function' ? onfulfilled : data => data
+  onrejected = typeof onrejected === 'function' ? onrejected : error => {throw error}
   
-}
+  // promise2 将作为 then 方法的返回值
+  let promise2
 
-Promise.prototype.then = function(onfulfilled = Function.prototype, onrejected = Function.prototype) {
+  if (this.status === 'fulfilled') {
+    return promise2 = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          // 这个新的 promise2 resolved 的值为 onfulfilled 的执行结果
+          let result = onfulfilled(this.value)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          reject(e)
+        }
+      })
+    })
+  }
+  if (this.status === 'rejected') {
+    return promise2 = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          // 这个新的 promise2 reject 的值为 onrejected 的执行结果
+         let result = onrejected(this.reason)
+         resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          reject(e)
+        }
+      })
+    })
+  }
   if (this.status === 'pending') {
-    this.onFulfilledArray.push(onfulfilled)
-    this.onRejectedArray.push(onrejected)
+    return promise2 = new Promise((resolve, reject) => {
+      this.onFulfilledArray.push(value => {
+        try {
+          let result = onfulfilled(value)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          return reject(e)
+        }
+      })
+
+      this.onRejectedArray.push(reason => {
+        try {
+          let result = onrejected(reason)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          return reject(e)
+        }
+      })      
+    })
   }
 }
 
+Promise.prototype.catch = function(catchFunc) {
+  return this.then(null, catchFunc)
+}
 
-let promise = new Promise((resolve, reject) => {
-  setTimeout(() => {
-    resolve('data')
-  }, 2000)
-})
+Promise.resolve = function(value) {
+  return new Promise((resolve, reject) => {
+    resolve(value)
+  })
+}
 
-promise.then(data => {
-  console.log(data)
-}, error => {
-  console.log('got error from promise', error)
-})
+Promise.reject = function(value) {
+  return new Promise((resolve, reject) => {
+    reject(value)
+  })
+}
 
+Promise.race = function(promiseArray) {
+  if (!Array.isArray(promiseArray)) {
+      throw new TypeError('The arguments should be an array!')
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const length = promiseArray.length
+      for (let i = 0; i <length; i++) {
+        promiseArray[i].then(resolve, reject)
+      }
+    }
+    catch(e) {
+      reject(e)
+    }
+  })
+}
 
+Promise.all = function(promiseArray) {
+  if (!Array.isArray(promiseArray)) {
+      throw new TypeError('The arguments should be an array!')
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      let resultArray = []
+      let count = 0
 
+      const length = promiseArray.length
 
+      for (let i = 0; i <length; i++) {
+        promiseArray[i].then(data => {
+          resultArray.push(data)
 
+          if (i === length - 1) {
+            resolve(resultArray)
+          }
+        }, reject)
+      }
+    }
+    catch(e) {
+      reject(e)
+    }
+  })
+}
 function Promise(executor) {
   this.status = 'pending'
   this.value = null
@@ -225,39 +230,219 @@ function Promise(executor) {
   this.onRejectedArray = []
 
   const resolve = value => {
-    if (this.status === 'pending') {
-      this.value = value
-      this.status = 'fulfilled'
-
-      this.onFulfilledArray.forEach(func => {
-        func(this.value)
-      })
+    if (value instanceof Promise) {
+      return value.then(resolve, reject)
     }
+    setTimeout(() => {
+      if (this.status === 'pending') {
+        this.value = value
+        this.status = 'fulfilled'
+
+        this.onFulfilledArray.forEach(func => {
+          func(value)
+        })
+      }
+    })
   }
 
   const reject = reason => {
-    if (this.status === 'pending') {
-      this.reason = reason
-      this.status = 'rejected'
+    setTimeout(() => {
+      if (this.status === 'pending') {
+        this.reason = reason
+        this.status = 'rejected'
 
-      this.onRejectedArray.forEach(func => {
-        func(this.reason)
-      })
-    }
+        this.onRejectedArray.forEach(func => {
+          func(reason)
+        })
+      }
+    })
   }
 
-  setTimeout(() => {
+
+  try {
+    executor(resolve, reject)
+  } catch(e) {
+    reject(e)
+  }
+}
+
+const resolvePromise = (promise2, result, resolve, reject) => {
+  // 当 result 和 promise2 相等时，也就是说 onfulfilled 返回 promise2 时，进行 reject
+  if (result === promise2) {
+    return reject(new TypeError('error due to circular reference'))
+  }
+
+  // 是否已经执行过 onfulfilled 或者 onrejected
+  let consumed = false
+  let thenable
+
+  if (result instanceof Promise) {
+    if (result.status === 'pending') {
+      result.then(function(data) {
+        resolvePromise(promise2, data, resolve, reject)
+      }, reject)
+    } else {
+      result.then(resolve, reject)
+    }
+    return
+  }
+
+  let isComplexResult = target => (typeof target === 'function' || typeof target === 'object') && (target !== null)
+  // 如果返回的是疑似 Promise 类型
+  if (isComplexResult(result)) {
     try {
-      executor(resolve, reject)
+      thenable = result.then
+      // 如果返回的是 Promise 类型，具有 then 方法
+      if (typeof thenable === 'function') {
+        thenable.call(result, function(data) {
+          if (consumed) {
+            return
+          }
+          consumed = true
+
+          return resolvePromise(promise2, data, resolve, reject)
+        }, function(error) {
+          if (consumed) {
+            return
+          }
+          consumed = true
+
+          return reject(error)
+        })
+      }
+      else {
+        return resolve(result)
+      }
+      
     } catch(e) {
+      if (consumed) {
+        return
+      }
+      consumed = true
+      return reject(e)
+    }
+  }
+  else {
+    return resolve(result)
+  }
+}
+
+Promise.prototype.then = function(onfulfilled, onrejected) {
+  onfulfilled = typeof onfulfilled === 'function' ? onfulfilled : data => data
+  onrejected = typeof onrejected === 'function' ? onrejected : error => {throw error}
+  
+  // promise2 将作为 then 方法的返回值
+  let promise2
+
+  if (this.status === 'fulfilled') {
+    return promise2 = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          // 这个新的 promise2 resolved 的值为 onfulfilled 的执行结果
+          let result = onfulfilled(this.value)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          reject(e)
+        }
+      })
+    })
+  }
+  if (this.status === 'rejected') {
+    return promise2 = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          // 这个新的 promise2 reject 的值为 onrejected 的执行结果
+         let result = onrejected(this.reason)
+         resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          reject(e)
+        }
+      })
+    })
+  }
+  if (this.status === 'pending') {
+    return promise2 = new Promise((resolve, reject) => {
+      this.onFulfilledArray.push(value => {
+        try {
+          let result = onfulfilled(value)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          return reject(e)
+        }
+      })
+
+      this.onRejectedArray.push(reason => {
+        try {
+          let result = onrejected(reason)
+          resolvePromise(promise2, result, resolve, reject)
+        }
+        catch(e) {
+          return reject(e)
+        }
+      })      
+    })
+  }
+}
+
+Promise.prototype.catch = function(catchFunc) {
+  return this.then(null, catchFunc)
+}
+
+Promise.resolve = function(value) {
+  return new Promise((resolve, reject) => {
+    resolve(value)
+  })
+}
+
+Promise.reject = function(value) {
+  return new Promise((resolve, reject) => {
+    reject(value)
+  })
+}
+
+Promise.race = function(promiseArray) {
+  if (!Array.isArray(promiseArray)) {
+      throw new TypeError('The arguments should be an array!')
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const length = promiseArray.length
+      for (let i = 0; i <length; i++) {
+        promiseArray[i].then(resolve, reject)
+      }
+    }
+    catch(e) {
       reject(e)
     }
   })
 }
 
-Promise.prototype.then = function(onfulfilled = Function.prototype, onrejected = Function.prototype) {
-  if (this.status === 'pending') {
-    this.onFulfilledArray.push(onfulfilled)
-    this.onRejectedArray.push(onrejected)
+Promise.all = function(promiseArray) {
+  if (!Array.isArray(promiseArray)) {
+      throw new TypeError('The arguments should be an array!')
   }
+  return new Promise((resolve, reject) => {
+    try {
+      let resultArray = []
+      let count = 0
+
+      const length = promiseArray.length
+
+      for (let i = 0; i <length; i++) {
+        promiseArray[i].then(data => {
+          resultArray.push(data)
+
+          if (i === length - 1) {
+            resolve(resultArray)
+          }
+        }, reject)
+      }
+    }
+    catch(e) {
+      reject(e)
+    }
+  })
 }
